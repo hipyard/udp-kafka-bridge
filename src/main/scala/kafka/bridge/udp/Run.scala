@@ -41,6 +41,9 @@ class Listener(nextActor: ActorRef) extends Actor {
   
   val conf = context.system.settings.config
 
+  val port = context.system.settings.config.getInt("bind.port")
+  println(s"Starting UDP -> Kafka bridge on port $port")
+  
   IO(Udp) ! Udp.Bind(self, new java.net.InetSocketAddress(
     conf.getString("bind.host"),
     conf.getInt("bind.port")))
@@ -63,7 +66,15 @@ class Generator(kafkaProps: java.util.Properties) extends Actor {
   val topic = context.system.settings.config.getString("topic")
 
   def receive = {
-    case message: String => 
-      producer.send(new KeyedMessage[Integer, String](topic, message))
+    case message: String =>
+      println(s"received message: $message")
+      val t = if (message.indexOf("$|$") < 0) {
+        topic
+      }
+      else {
+        val topicAndMessage = message.split("\\$|$", 2)
+        if (topicAndMessage.length == 2) topicAndMessage(0) else topic
+      }
+      producer.send(new KeyedMessage[Integer, String](t, message))
   }
 }
